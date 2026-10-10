@@ -1,0 +1,14 @@
+{
+  "name": "gg-deals-mcp",
+  "version": "1.0.0",
+  "description": "Read-only MCP server for the official GG.deals Prices API",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "PierreBonnet",
+  "engines": { "node": ">=22" },
+  "bin": { "gg-deals-mcp": "src/index.js" },
+  "scripts": { "start": "node src/index.js", "test": "node --test" },
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.1", "zod": "^4.6.5" },
+  "repository": { "type": "git", "url": "https://github.com/PierreBonnet/gg-deals-mcp.git" }
+}
