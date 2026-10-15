@@ -1,5 +1,6 @@
 # gg-deals-mcp
 
+[![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir%20le%20projet-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/pierrobn)
 [![CI](https://github.com/PierreBonnet/gg-deals-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/PierreBonnet/gg-deals-mcp/actions/workflows/ci.yml)
 
 Serveur MCP en lecture seule pour l’[API Prices officielle de GG.deals](https://gg.deals/api/prices/). Il permet à un assistant de comparer les prix de jeux, packs et bundles Steam. Projet communautaire indépendant, sans affiliation avec GG.deals ou Valve.
@@ -91,6 +92,10 @@ npm audit --omit=dev --audit-level=high
 Les tests utilisent des réponses simulées pour vérifier les trois routes, les paramètres, les prix absents, le cache, les quotas, les erreurs et la confidentialité de la clé. Ils vérifient aussi le dialogue MCP, la découverte des outils et le démarrage stdio depuis un autre répertoire. Ils ne nécessitent pas de clé et ne constituent pas un test réel du compte GG.deals.
 
 GitHub Actions exécute les vérifications sous Windows et Linux, avec Node 22 et 24. Les dépendances sont verrouillées dans `package-lock.json`. Le SDK MCP 1.x est utilisé pour rester cohérent avec les autres serveurs de ce compte.
+
+## Soutenir le projet
+
+Si ce serveur MCP vous est utile, vous pouvez soutenir son développement et sa maintenance avec un don facultatif sur [Ko-fi](https://ko-fi.com/pierrobn). Merci pour votre soutien !
 
 ## Licence
 
