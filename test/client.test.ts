@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DealsClient } from '../src/client.js';
+import { DealsClient, DealsError } from '../src/client.js';
+
+import type { FetchPrices, DealsClientOptions } from '../src/client.js';
 
 const game = { title: 'Fixture Game', url: 'https://gg.deals/game/fixture/', prices: {
   currentRetail: '12.99', currentKeyshops: '8.00', historicalRetail: '0.00', historicalKeyshops: null, currency: 'EUR',
 } };
-const reply = data => Response.json({ success: true, data });
-const clientWith = (fetchImpl, options = {}) => new DealsClient({ apiKey: 'secret-fixture', fetchImpl, ...options });
+const reply = (data: unknown) => Response.json({ success: true, data });
+const clientWith = (fetchImpl: FetchPrices, options: DealsClientOptions = {}) => new DealsClient({ apiKey: 'secret-fixture', fetchImpl, ...options });
 
 for (const kind of ['app', 'sub', 'bundle']) test(`${kind}: correct route, region, IDs, prices and unknown item`, async () => {
   const client = clientWith(async (url, options) => {
@@ -29,16 +31,16 @@ test('validates before any network request', async () => {
     await assert.rejects(client.prices('app', args), { code: 'INVALID_INPUT' });
   }
   await assert.rejects(client.prices('other', { ids: [1] }), { code: 'INVALID_INPUT' });
-  await assert.rejects(clientWith(() => {}, { apiKey: '' }).prices('app', { ids: [1] }), { code: 'MISSING_API_KEY' });
-  await assert.rejects(clientWith(() => {}, { region: 'bad' }).prices('app', { ids: [1] }), { code: 'INVALID_REGION' });
+  await assert.rejects(clientWith(() => assert.fail('network must not be called'), { apiKey: '' }).prices('app', { ids: [1] }), { code: 'MISSING_API_KEY' });
+  await assert.rejects(clientWith(() => assert.fail('network must not be called'), { region: 'bad' }).prices('app', { ids: [1] }), { code: 'INVALID_REGION' });
 });
 
 test('cache supports overlap, null, expiry, separate regions and ID types', async () => {
   let now = 0;
-  const requests = [];
+  const requests: (string | null)[] = [];
   const client = clientWith(async url => {
     requests.push(url.searchParams.get('ids'));
-    return reply(Object.fromEntries(url.searchParams.get('ids').split(',').map(id => [id, null])));
+    return reply(Object.fromEntries(url.searchParams.get('ids')!.split(',').map(id => [id, null])));
   }, { now: () => now });
   await client.prices('app', { ids: [1, 2] });
   const overlap = await client.prices('app', { ids: [2, 3] });
@@ -52,7 +54,7 @@ test('cache supports overlap, null, expiry, separate regions and ID types', asyn
 
 test('record quotas cover minute, hour and concurrent calls', async () => {
   let now = 0;
-  const client = clientWith(async url => reply(Object.fromEntries(url.searchParams.get('ids').split(',').map(id => [id, null]))), { now: () => now });
+  const client = clientWith(async url => reply(Object.fromEntries(url.searchParams.get('ids')!.split(',').map(id => [id, null]))), { now: () => now });
   for (let batch = 0; batch < 10; batch++) {
     now = batch * 60000;
     const ids = Array.from({ length: 100 }, (_, i) => 1 + batch * 100 + i);
@@ -61,7 +63,7 @@ test('record quotas cover minute, hour and concurrent calls', async () => {
     await pending;
   }
   now = 600000;
-  await assert.rejects(client.prices('sub', { ids: [99999] }), error => error.code === 'RATE_LIMIT' && error.retryAfterSeconds === 3000);
+  await assert.rejects(client.prices('sub', { ids: [99999] }), error => error instanceof DealsError && error.code === 'RATE_LIMIT' && error.retryAfterSeconds === 3000);
   now = 3600000;
   await client.prices('sub', { ids: [99999] });
 });
@@ -72,10 +74,10 @@ test('429 exposes sanitized quota and does not retry automatically', async () =>
     calls++;
     return new Response('secret-fixture', { status: 429, headers: { 'retry-after': '120', 'x-ratelimit-remaining': '0' } });
   });
-  await assert.rejects(client.prices('app', { ids: [1] }), error => error.code === 'RATE_LIMIT' && error.retryAfterSeconds === 120);
+  await assert.rejects(client.prices('app', { ids: [1] }), error => error instanceof DealsError && error.code === 'RATE_LIMIT' && error.retryAfterSeconds === 120);
   await assert.rejects(client.prices('app', { ids: [1] }), { code: 'RATE_LIMIT' });
   assert.equal(calls, 1);
-  assert.equal(client.status().remoteRateLimit.remaining, 0);
+  assert.equal(client.status().remoteRateLimit?.remaining, 0);
 });
 
 test('errors never echo credentials, remote bodies, status text or network causes', async () => {
@@ -90,8 +92,10 @@ test('errors never echo credentials, remote bodies, status text or network cause
   ]) {
     await assert.rejects(clientWith(fetcher).prices('app', { ids: [1] }), error => {
       assert.ok(!String(error).includes('secret-fixture'));
+      assert.ok(error instanceof Error);
       assert.equal(error.cause, undefined);
       return true;
     });
   }
 });
+

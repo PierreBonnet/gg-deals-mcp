@@ -1,6 +1,23 @@
 import { z } from 'zod';
 
-export const REGIONS = ['au', 'be', 'br', 'ca', 'ch', 'de', 'dk', 'es', 'eu', 'fi', 'fr', 'gb', 'ie', 'it', 'nl', 'no', 'pl', 'se', 'us'];
+export const REGIONS = ['au', 'be', 'br', 'ca', 'ch', 'de', 'dk', 'es', 'eu', 'fi', 'fr', 'gb', 'ie', 'it', 'nl', 'no', 'pl', 'se', 'us'] as const;
+export type Region = typeof REGIONS[number];
+export type IdKind = 'app' | 'sub' | 'bundle';
+export type FetchPrices = (url: URL, options: RequestInit) => Promise<Response>;
+export interface DealsClientOptions {
+  apiKey?: string;
+  region?: string;
+  fetchImpl?: FetchPrices;
+  now?: () => number;
+}
+export interface RateLimit {
+  limit: number | null;
+  remaining: number | null;
+  reset: number | null;
+}
+function isRegion(value: string): value is Region {
+  return REGIONS.some(region => region === value);
+}
 export const inputSchema = {
   ids: z.array(z.number().int().positive().max(Number.MAX_SAFE_INTEGER)).min(1).max(100)
     .describe('1–100 Steam IDs of the type requested by this tool. Duplicates count once.'),
@@ -18,10 +35,19 @@ const gameSchema = z.object({
     historicalRetail: amount, historicalKeyshops: amount, currency: z.string().regex(/^[A-Z]{3}$/) }),
 }).nullable();
 const responseSchema = z.object({ success: z.literal(true), data: z.record(z.string(), gameSchema) });
+export type Game = z.infer<typeof gameSchema>;
+export type PriceRequest = z.infer<typeof requestSchema>;
+interface CacheEntry {
+  value: Game;
+  fetchedAt: string;
+  expires: number;
+}
 const kinds = new Set(['app', 'sub', 'bundle']);
 
 export class DealsError extends Error {
-  constructor(code, message, retryAfterSeconds) {
+  readonly code: string;
+  readonly retryAfterSeconds: number | undefined;
+  constructor(code: string, message: string, retryAfterSeconds?: number) {
     super(message);
     this.code = code;
     this.retryAfterSeconds = retryAfterSeconds;
@@ -29,15 +55,16 @@ export class DealsError extends Error {
 }
 
 export class DealsClient {
-  #key;
-  #fetch;
-  #now;
-  #cache = new Map();
-  #records = [];
+  #key: string | undefined;
+  #fetch: FetchPrices;
+  #now: () => number;
+  #cache = new Map<string, CacheEntry>();
+  #records: number[] = [];
   #cooldown = 0;
-  #quota = null;
+  #quota: RateLimit | null = null;
+  region: string;
   constructor({ apiKey = process.env.GG_DEALS_API_KEY, region = process.env.GG_DEALS_REGION || 'fr',
-    fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+    fetchImpl = globalThis.fetch, now = Date.now }: DealsClientOptions = {}) {
     this.#key = apiKey?.trim();
     this.region = region;
     this.#fetch = fetchImpl;
@@ -45,12 +72,12 @@ export class DealsClient {
   }
   status() {
     return { configured: Boolean(this.#key && this.#key !== 'REPLACE_LOCALLY'),
-      defaultRegion: REGIONS.includes(this.region) ? this.region : null,
+      defaultRegion: isRegion(this.region) ? this.region : null,
       supportedRegions: REGIONS, cacheTtlSeconds: 300,
       limits: { recordsPerMinute: 100, recordsPerHour: 1000, scope: 'this server process' },
       remoteRateLimit: this.#quota };
   }
-  #reserve(count, now) {
+  #reserve(count: number, now: number) {
     if (now < this.#cooldown) throw new DealsError('RATE_LIMIT', 'GG.deals quota exceeded. Retry later.', Math.ceil((this.#cooldown - now) / 1000));
     this.#records = this.#records.filter(time => time > now - 3600000);
     const minute = this.#records.filter(time => time > now - 60000);
@@ -60,19 +87,19 @@ export class DealsClient {
     if (wait > 0) throw new DealsError('RATE_LIMIT', 'Local record quota reached. Retry later or request fewer IDs.', Math.ceil(wait / 1000));
     this.#records.push(...Array(count).fill(now));
   }
-  async prices(kind, args) {
+  async prices(kind: string, args: unknown) {
     const parsed = requestSchema.safeParse(args);
     if (!kinds.has(kind) || !parsed.success) throw new DealsError('INVALID_INPUT', 'Provide 1–100 positive integer Steam IDs and a supported region.');
     const region = parsed.data.region ?? this.region;
-    if (!REGIONS.includes(region)) throw new DealsError('INVALID_REGION', 'GG_DEALS_REGION must be a supported region code.');
-    if (!this.status().configured) throw new DealsError('MISSING_API_KEY', 'Set GG_DEALS_API_KEY in your local MCP environment. Never send API keys in chat.');
+    if (!isRegion(region)) throw new DealsError('INVALID_REGION', 'GG_DEALS_REGION must be a supported region code.');
+    if (!this.#key || !this.status().configured) throw new DealsError('MISSING_API_KEY', 'Set GG_DEALS_API_KEY in your local MCP environment. Never send API keys in chat.');
     const ids = [...new Set(parsed.data.ids)].map(String);
     const now = this.#now();
     for (const [key, value] of this.#cache) if (value.expires <= now) this.#cache.delete(key);
-    const cacheKey = id => `${kind}:${region}:${id}`;
+    const cacheKey = (id: string) => `${kind}:${region}:${id}`;
     const missing = ids.filter(id => !this.#cache.has(cacheKey(id)));
     const cached = new Map(ids.map(id => [id, this.#cache.get(cacheKey(id))]));
-    const fetched = new Map();
+    const fetched = new Map<string, CacheEntry>();
     if (missing.length) {
       this.#reserve(missing.length, now);
       const url = new URL(`https://api.gg.deals/v1/prices/by-steam-${kind}-id/`);
@@ -83,7 +110,7 @@ export class DealsClient {
       } catch {
         throw new DealsError('NETWORK_ERROR', 'Could not reach GG.deals within 15 seconds.');
       }
-      const numericHeader = name => {
+      const numericHeader = (name: string) => {
         const value = response.headers.get(name);
         return value !== null && /^\d{1,12}$/.test(value) ? Number(value) : null;
       };
@@ -108,10 +135,11 @@ export class DealsClient {
         fetched.set(id, entry);
       }
     }
-    const data = {};
-    const fetchedAt = {};
+    const data: Record<string, Game> = {};
+    const fetchedAt: Record<string, string> = {};
     for (const id of ids) {
       const entry = fetched.get(id) ?? cached.get(id);
+      if (!entry) throw new DealsError('INTERNAL_ERROR', 'Unable to retrieve GG.deals prices.');
       data[id] = entry.value;
       fetchedAt[id] = entry.fetchedAt;
     }

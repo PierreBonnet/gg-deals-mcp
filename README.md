@@ -16,7 +16,7 @@ npm ci
 npm test
 ```
 
-Aucune compilation n’est nécessaire. Le serveur démarre avec `node /chemin/absolu/gg-deals-mcp/src/index.js` et communique sur **stdio**. L’absence de texte au démarrage est normale : il attend les messages du client MCP.
+Le serveur est écrit en TypeScript strict. `npm ci` compile automatiquement les sources dans `dist/` via le script `prepare`. Après une modification des sources, lancez `npm run build`. Le serveur démarre avec `node /chemin/absolu/gg-deals-mcp/dist/index.js` et communique sur **stdio**. L’absence de texte au démarrage est normale : il attend les messages du client MCP.
 
 Dans un client acceptant le format `mcpServers`, adaptez cet exemple à votre installation :
 
@@ -25,7 +25,7 @@ Dans un client acceptant le format `mcpServers`, adaptez cet exemple à votre in
   "mcpServers": {
     "gg-deals": {
       "command": "node",
-      "args": ["C:/mcp/gg-deals-mcp/src/index.js"],
+      "args": ["C:/mcp/gg-deals-mcp/dist/index.js"],
       "env": {
         "GG_DEALS_API_KEY": "REPLACE_LOCALLY",
         "GG_DEALS_REGION": "fr"
@@ -39,7 +39,7 @@ Sous macOS/Linux, remplacez le chemin Windows par le chemin absolu du fichier. S
 
 Renseignez la clé uniquement dans la configuration privée du client ou dans son gestionnaire de secrets, puis redémarrez le serveur. **Ne transmettez pas la clé à l’assistant et ne la commitez pas.** `GG_DEALS_REGION` est facultatif et vaut `fr` par défaut ; un appel peut choisir une autre région.
 
-Le fichier `.env.example` sert de modèle. Les fichiers `.env` ne sont pas chargés automatiquement. Pour un démarrage manuel avec un fichier local, Node permet `node --env-file=.env src/index.js` depuis le dépôt.
+Le fichier `.env.example` sert de modèle. Les fichiers `.env` ne sont pas chargés automatiquement. Pour un démarrage manuel avec un fichier local, Node permet `node --env-file=.env dist/index.js` depuis le dépôt.
 
 Le dépôt distribue le code source sur GitHub. Il ne fournit pas d’URL MCP hébergée ni de publication npm. Le client doit pouvoir lancer un processus local sur stdio.
 
@@ -82,12 +82,19 @@ GG.deals limite la clé à 100 éléments par minute et 1 000 par heure. Le serv
 
 Les erreurs de quota sont rendues à l’assistant avec un délai `retryAfterSeconds`. Aucun nouvel essai automatique ne consomme de quota supplémentaire. Le délai réseau est de 15 secondes. Les réponses HTTP, erreurs réseau et erreurs de format sont remplacées par des messages contrôlés ; les URLs contenant la clé, corps d’erreur distants et causes brutes ne sont pas renvoyés. Les redirections HTTP sont refusées.
 
+## Migration depuis la version JavaScript
+
+Après la mise à jour du dépôt, exécutez `npm ci`, puis remplacez `src/index.js` par `dist/index.js` dans la configuration de votre client MCP et redémarrez le serveur. Les outils, leurs arguments et les variables d’environnement restent identiques.
+
 ## Développement et vérification
 
 ```sh
+npm run typecheck
 npm test
 npm audit --omit=dev --audit-level=high
 ```
+
+Les sources (`src/*.ts`) et les tests (`test/*.ts`) sont vérifiés en mode strict. `npm test` compile le serveur dans `dist/`, compile la suite dans `.test-build/`, puis lance les tests avec Node. Le test stdio lance le point d’entrée `dist/index.js`. Ces deux répertoires générés sont ignorés par Git.
 
 Les tests utilisent des réponses simulées pour vérifier les trois routes, les paramètres, les prix absents, le cache, les quotas, les erreurs et la confidentialité de la clé. Ils vérifient aussi le dialogue MCP, la découverte des outils et le démarrage stdio depuis un autre répertoire. Ils ne nécessitent pas de clé et ne constituent pas un test réel du compte GG.deals.
 

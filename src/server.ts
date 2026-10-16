@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { DealsClient, DealsError, inputSchema } from './client.js';
 
 export function createServer(client = new DealsClient()) {
@@ -6,7 +7,7 @@ export function createServer(client = new DealsClient()) {
     instructions: 'Read-only GG.deals price tools. Use the correct Steam app, sub or bundle IDs. Keep official stores and keyshops distinct. Prices are decimal strings in the returned currency, not guaranteed purchase offers. Null means unavailable or unknown, never free. Data can be cached for five minutes. No title search or individual shop listing is provided by this API. Never request API keys in chat.',
   });
   const annotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true };
-  const result = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value });
+  const result = (value: Record<string, unknown>): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value });
   server.registerTool('gg_deals_status', {
     description: 'Show local configuration, supported regions and last observed quota. Does not validate the API key or call the network.',
     inputSchema: {}, annotations: { ...annotations, openWorldHint: false },
