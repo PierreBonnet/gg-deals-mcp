@@ -86,6 +86,14 @@ Les erreurs de quota sont rendues à l’assistant avec un délai `retryAfterSec
 
 Après la mise à jour du dépôt, exécutez `npm ci`, puis remplacez `src/index.js` par `dist/index.js` dans la configuration de votre client MCP et redémarrez le serveur. Les outils, leurs arguments et les variables d’environnement restent identiques.
 
+## Réponses compactes et économie de tokens
+
+Les trois outils de prix acceptent `detail: "compact"` (par défaut) ou `detail: "detailed"`. Le mode compact omet uniquement les dernières métadonnées de quota `rateLimit`, consultables via le statut ou le mode détaillé. Les quatre prix actuels/historiques, leur devise, les valeurs inconnues, la région et les dates de récupération par ID restent présents. Les réponses étant déjà courtes, le gain attendu est limité.
+
+Exemple : `{"ids":[420],"region":"fr","detail":"detailed"}`. Les résultats structurés et leur représentation texte sont conservés pour la compatibilité des clients MCP.
+
+Les gains dépendent de la taille des résultats et du client MCP ; ce mode ne garantit pas un pourcentage de réduction des tokens.
+
 ## Développement et vérification
 
 ```sh

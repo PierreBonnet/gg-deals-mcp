@@ -55,3 +55,23 @@ test('MCP tool calls return structured prices and reject invalid input without a
   } finally { await client.close(); await server.close(); }
 });
 
+test('compact and detailed preserve all prices, currency, missing IDs and freshness', async () => {
+  const server = createServer(new DealsClient({ apiKey: 'fixture', fetchImpl: async () =>
+    Response.json({ success: true, data: { 420: { title: 'Game', url: 'https://gg.deals/game/game/',
+      prices: { currentRetail: '12.00', currentKeyshops: null, historicalRetail: '9.00', historicalKeyshops: '8.00', currency: 'EUR' } }, 421: null } }) }));
+  const client = new Client({ name: 'compact-test', version: '1' });
+  const [a,b] = InMemoryTransport.createLinkedPair();
+  await server.connect(a); await client.connect(b);
+  try {
+    const name = 'gg_deals_prices_by_steam_app_id';
+    const response = z.record(z.string(), z.unknown());
+    const small = response.parse((await client.callTool({ name, arguments: { ids: [420,421] } })).structuredContent);
+    const full = response.parse((await client.callTool({ name, arguments: { ids: [420,421], detail: 'detailed' } })).structuredContent);
+    assert.deepEqual(small.data, full.data);
+    assert.deepEqual(small.fetchedAt, full.fetchedAt);
+    assert.equal('rateLimit' in small, false);
+    assert.equal('rateLimit' in full, true);
+    assert.equal((await client.callTool({ name, arguments: { ids: [420], detail: 'bad' } })).isError, true);
+  } finally { await client.close(); await server.close(); }
+});
+
