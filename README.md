@@ -1,7 +1,7 @@
 # gg-deals-mcp
 
 [![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir%20le%20projet-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/pierrobn)
-[![CI](https://github.com/PierreBonnet/gg-deals-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/PierreBonnet/gg-deals-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/pierro-bn/gg-deals-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/pierro-bn/gg-deals-mcp/actions/workflows/ci.yml)
 
 Serveur MCP en lecture seule pour l’[API Prices officielle de GG.deals](https://gg.deals/api/prices/). Il permet à un assistant de comparer les prix de jeux, packs et bundles Steam. Projet communautaire indépendant, sans affiliation avec GG.deals ou Valve.
 
@@ -10,7 +10,7 @@ Serveur MCP en lecture seule pour l’[API Prices officielle de GG.deals](https:
 Prérequis : **Node.js 22 ou plus récent**, npm et une clé API créée dans les [paramètres de votre compte GG.deals](https://gg.deals/settings/).
 
 ```sh
-git clone https://github.com/PierreBonnet/gg-deals-mcp.git
+git clone https://github.com/pierro-bn/gg-deals-mcp.git
 cd gg-deals-mcp
 npm ci
 npm test
@@ -98,7 +98,7 @@ Les sources (`src/*.ts`) et les tests (`test/*.ts`) sont vérifiés en mode stri
 
 Les tests utilisent des réponses simulées pour vérifier les trois routes, les paramètres, les prix absents, le cache, les quotas, les erreurs et la confidentialité de la clé. Ils vérifient aussi le dialogue MCP, la découverte des outils et le démarrage stdio depuis un autre répertoire. Ils ne nécessitent pas de clé et ne constituent pas un test réel du compte GG.deals.
 
-GitHub Actions exécute les vérifications sous Windows et Linux, avec Node 22 et 24. Les dépendances sont verrouillées dans `package-lock.json`. Le SDK MCP 1.x est utilisé pour rester cohérent avec les autres serveurs de ce compte.
+GitHub Actions exécute les vérifications sous Windows et Linux, avec Node 22 et 24. Les dépendances sont verrouillées dans `package-lock.json`. Ce serveur utilise le SDK MCP TypeScript 1.x ; les autres serveurs peuvent utiliser une autre version du SDK.
 
 ## Soutenir le projet
 
